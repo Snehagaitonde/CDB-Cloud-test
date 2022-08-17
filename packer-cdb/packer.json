@@ -1,0 +1,55 @@
+{
+        "min_packer_version": "0.12.0",
+        "variables": {
+                "aws_region": "us-east-1",
+                "base_ami_name": "couchdb"
+        },
+        "builders": [
+                {
+                        "name": "amazonlinux-ami",
+                        "ami_name": "{{user `base_ami_name`}}-amazonlinux-{{isotime | clean_resource_name}}",
+                        "ami_description": "An Amazon Linux 2 AMI that has Couchbase installed.",
+                        "instance_type": "t2.micro",
+                        "region": "{{user `aws_region`}}",
+                        "type": "amazon-ebs",
+                        "source_ami_filter": {
+                                "filters": {
+                                        "virtualization-type": "hvm",
+                                        "architecture": "x86_64",
+                                        "name": "*amzn2-ami-kernel-*",
+                                        "block-device-mapping.volume-type": "gp2",
+                                        "root-device-type": "ebs"
+                                },
+                                "owners": [
+                                        "137112412989"
+                                ],
+                                "most_recent": true
+                        },
+                        "ssh_username": "ec2-user"
+                }
+        ],
+        "provisioners": [
+                {
+                        "type": "shell",
+                        "pause_before": "5s",
+                        "inline": [
+                                "sudo yum update -y",
+                                "sudo yum install -y yum-utils jq",
+                                "sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo && sleep 5",
+                                "sudo sed -i -e 's/el$releasever/el7/g' /etc/yum.repos.d/couchdb.repo",
+                                "sudo yum repolist",
+                                "sudo yum install -y couchdb",
+                                "sudo systemctl stop couchdb",
+                                "sudo systemctl disable couchdb",
+                                "sudo chmod 777 /opt/couchdb/etc/default.d",
+                                "sudo echo -e '[admins]\nadmin = password' >> /opt/couchdb/etc/default.d/admin.ini",
+                                "sudo chmod 755 /opt/couchdb/etc/default.d",
+                                "sudo sed -i -e 's/bind_address = 127.0.0.1/bind_address = 0.0.0.0/g' /opt/couchdb/etc/default.ini",
+                                "sudo sed -i -e 's/kernel inet_dist_use_interface {127,0,0,1}/kernel inet_dist_use_interface {0,0,0,0}/g' /opt/couchdb/etc/vm.args",
+                                "sudo sed -i -e \"/kernel inet_dist_use_interface/a -kernel inet_dist_listen_min 9100\" /opt/couchdb/etc/vm.args",
+                                "sudo sed -i -e \"/kernel inet_dist_use_interface/a -kernel inet_dist_listen_max 9200\" /opt/couchdb/etc/vm.args"
+			]
+                }
+        ],
+        "post-processors": []
+}
